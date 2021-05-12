@@ -7,8 +7,6 @@ provider "aws" {
 # Create AWS VPC
 resource "aws_vpc" "test-vpc" {
     cidr_block           = "10.0.0.0/16"
-    enable_dns_hostnames = true
-    enable_dns_support   = true
     instance_tenancy     = var.instance_tenancy
 
     tags = {
@@ -17,25 +15,14 @@ resource "aws_vpc" "test-vpc" {
 }
 
 # Create Public Subnet
-resource "aws_subnet" "test-publicsubnet-one" {
-    vpc_id                  = aws_vpc.test-vpc.id
-    cidr_block              = "10.0.0.0/24"
-    availability_zone       = var.az1
-    map_public_ip_on_launch = false
-
-    tags = {
-        Name = "test-publicsubnet-one"
-    }
-}
-
-resource "aws_subnet" "test-publicsubnet-two" {
+resource "aws_subnet" "test-pub-subnet" {
     vpc_id                  = aws_vpc.test-vpc.id
     cidr_block              = "10.0.1.0/24"
-    availability_zone       = var.az2
-    map_public_ip_on_launch = false
+    availability_zone       = var.az1
+    map_public_ip_on_launch = true
 
     tags = {
-        Name = "test-publicsubnet-two"
+        Name = "test-pub-subnet"
     }
 }
 
@@ -48,7 +35,7 @@ resource "aws_internet_gateway" "test-igw" {
     }
 }
 #Create Routing Table
-resource "aws_route_table" "test-rt-one" {
+resource "aws_route_table" "test-rtb" {
     vpc_id     = aws_vpc.test-vpc.id
 
     route {
@@ -57,32 +44,14 @@ resource "aws_route_table" "test-rt-one" {
     }
 
     tags = {
-        Name = "test-rt-one"
-    }
-}
-
-resource "aws_route_table" "test-rt-two" {
-    vpc_id     = aws_vpc.test-vpc.id
-
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.test-igw.id
-    }
-
-    tags = {
-        Name = "test-rt-two"
+        Name = "test-rtb"
     }
 }
 
 #Create Route Table Association
-resource "aws_route_table_association" "test-rtb-one" {
-    route_table_id = aws_route_table.test-rt-one.id
-    subnet_id = aws_subnet.test-publicsubnet-one.id
-}
-
-resource "aws_route_table_association" "test-rtb-two" {
-    route_table_id = aws_route_table.test-rt-two.id
-    subnet_id = aws_subnet.test-publicsubnet-two.id
+resource "aws_route_table_association" "test-rtba" {
+    route_table_id = aws_route_table.test-rtb.id
+    subnet_id = aws_subnet.test-pub-subnet.id
 }
 
 #Create Security Group
@@ -95,8 +64,15 @@ resource "aws_security_group" "test-sg" {
         from_port       = 22
         to_port         = 22
         protocol        = "tcp"
-        cidr_blocks     = ["10.0.0.0/16", "116.87.195.28/32"]
+        cidr_blocks     = ["0.0.0.0/0"]
     }
+
+    ingress {
+        from_port       = 0
+        to_port         = 65535
+        protocol        = "tcp"
+        cidr_blocks     = ["0.0.0.0/0"]
+}
 
     egress {
         from_port       = 0
@@ -110,39 +86,25 @@ resource "aws_security_group" "test-sg" {
     }
 }
 
-# Create Launch Template
-resource "aws_launch_template" "test-lt" {
-    name_prefix   = "testlt"
-    image_id      = var.ami_id
-    instance_type = var.instance_type
-    key_name = var.key_name
-    block_device_mappings {
-    device_name = var.device_name
+# Create Launch Configuration
 
-    ebs {
-      volume_size = var.volume_size
-    }
+resource "aws_launch_configuration" "test-lc" {
+  name_prefix   = "test-lc-"
+  image_id      = var.ami_id
+  instance_type = var.instance_type
+  security_groups = [aws_security_group.test-sg.id]
+  associate_public_ip_address = true
+  key_name = "test-key"
+  root_block_device {
+    volume_type = "gp2"
+    volume_size = 10
+    delete_on_termination = true
+
+  }
+  lifecycle {
+    create_before_destroy = true
   }
 
-    credit_specification {
-    cpu_credits = var.cpu_credits
-  }
-
-    disable_api_termination = true
-    monitoring {
-    enabled = true
-  }
-
-  network_interfaces {
-    associate_public_ip_address = true
-  }
-    tag_specifications {
-    resource_type = "instance"
-
-    tags = {
-      Name = "test-vm"
-    }
-  }
 }
 
 # Create AWS Autoscalling Group
@@ -153,10 +115,10 @@ resource "aws_autoscaling_group" "test-asg" {
     max_size                  = var.max_size
     min_size                  = var.min_size
     name                      = "testasg"
-    vpc_zone_identifier       = [aws_subnet.test-publicsubnet-one.id, aws_subnet.test-publicsubnet-two.id]
-    launch_template {
-      id      = aws_launch_template.test-lt.id
-      version = "$Latest"
-    }
+    vpc_zone_identifier       = [aws_subnet.test-pub-subnet.id]
+    launch_configuration = aws_launch_configuration.test-lc.name
+    lifecycle {
+     create_before_destroy = true
+   }
 
 }

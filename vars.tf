@@ -10,12 +10,6 @@ variable "az1" {
   description = "AWS Availablity Zone 1a"
 }
 
-variable "az2" {
-  type    = string
-  default = "us-west-1c"
-  description = "AWS Availablity Zone 1b"
-}
-
 variable "ami_id" {
   type    = string
   default = "ami-0d382e80be7ffdae5"
@@ -30,7 +24,7 @@ variable "instance_tenancy" {
 
 variable "instance_type" {
   type    = string
-  default = "t2.micro"
+  default = "t2.medium"
   description = "AWS Instance Type"
 }
 
@@ -42,7 +36,7 @@ variable "device_name" {
 
 variable "volume_size" {
   type    = number
-  default = 8
+  default = 10
   description = "AWS volume size"
 }
 
@@ -52,15 +46,9 @@ variable "key_name" {
   description = "AWS key name"
 }
 
-variable "cpu_credits" {
-  type    = string
-  default = "standard"
-  description = "aws cpu credits"
-}
-
 variable "desired_capacity" {
   type    = string
-  default = "2"
+  default = "1"
   description = "ASG Desired Capacity"
 }
 
@@ -78,12 +66,12 @@ variable "health_check_type" {
 
 variable "max_size" {
   type    = string
-  default = "2"
+  default = "1"
   description = "ASG Max Size"
 }
 
 variable "min_size" {
   type    = string
-  default = "2"
+  default = "1"
   description = "ASG Min Size"
 }
